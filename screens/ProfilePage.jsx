@@ -8,6 +8,7 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
+  Linking,
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import Header_page from '../components/Header_page';
@@ -15,16 +16,24 @@ import { Search } from 'lucide-react-native';
 import { PhoneCall, ScanQrCode } from 'lucide-react-native';
 
 const dummyProfiles = [
-  { id: 1, name: 'Johnnie Thompson', role: 'Frontend Developer', experience: '4 - 6 Years' },
-  { id: 2, name: 'Miss Joy Blick', role: 'Frontend Developer', experience: '4 - 6 Years' },
-  { id: 3, name: 'Ms. Alma Collins', role: 'Frontend Developer', experience: '4 - 6 Years' },
-  { id: 4, name: 'Dr. Erick Hettinger', role: 'Frontend Developer', experience: '4 - 6 Years' },
-  { id: 5, name: 'Kristie Nienow V', role: 'Frontend Developer', experience: '4 - 6 Years' },
+  { id: 1, name: 'Johnnie Thompson', role: 'Frontend Developer', experience: '4 - 6 Years' ,number:'8848527200'},
+  { id: 2, name: 'Miss Joy Blick', role: 'Frontend Developer', experience: '4 - 6 Years' ,number:'8075011889'},
+  { id: 3, name: 'Ms. Alma Collins', role: 'Frontend Developer', experience: '4 - 6 Years',number:'8075011889' },
+  { id: 4, name: 'Dr. Erick Hettinger', role: 'Frontend Developer', experience: '4 - 6 Years',number:'8075011889' },
+  { id: 5, name: 'Kristie Nienow V', role: 'Frontend Developer', experience: '4 - 6 Years' ,number:'8075011889'},
 ];
 
 export default function ProfilePage() {
   const route = useRoute();
   const { ticket } = route.params;
+
+  const handleCall=(phonenumber)=>{
+    const url=`tel:${phonenumber}`;
+    console.log("clicked the phonenumber",phonenumber);
+    
+    Linking.openURL(url)
+    .catch(err=>console.log("while openning call",err))
+  }
 
   const renderProfile = ({ item }) => (
     <View style={styles.profileCard}>
@@ -34,7 +43,7 @@ export default function ProfilePage() {
           {item.role} | {item.experience}
         </Text>
       </View>
-      <TouchableOpacity style={styles.callBtn}>
+      <TouchableOpacity style={styles.callBtn} onPress={()=>handleCall(item.number)}>
         <PhoneCall size={20} color="#fff" />
       </TouchableOpacity>
     </View>
