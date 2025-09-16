@@ -24,12 +24,9 @@
         android:allowBackup="false"
         android:requestLegacyExternalStorage="true"
         android:theme="@style/AppTheme"
-        android:supportsRtl="true">
-        <receiver android:name=".CallReceiver" android:exported="true">
-        <intent-filter>
-            <action android:name="android.intent.action.PHONE_STATE"/>
-        </intent-filter>
-        </receiver>
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="true">
+      
 
         <activity
             android:name=".MainActivity"

@@ -5,31 +5,77 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  Image
+  Image,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
-import { Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react-native'; 
+import { Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import EncryptedStorage from 'react-native-encrypted-storage';
+import api from '../services/api';
 
 function Loginpage() {
   const [showPassword, setShowPassword] = useState(false);
-  const navigation = useNavigation();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+const navigation = useNavigation();
+
+const handleLogin = async () => {
+  if (!email || !password) {
+    Alert.alert("Error", "Please enter both email and password");
+    return;
+  }
+
+console.log(email,password)
+
+  setLoading(true);
+ try {
+  const response = await api.post("/login/", { email, password });
+  console.log(response);
+
+  if (response.data?.token) {
+    await EncryptedStorage.setItem("authToken", response.data.token);
+    navigation.reset({ index: 0, routes: [{ name: "Ticket" }] });
+  } else {
+    Alert.alert("Login Failed", "Invalid response from server");
+  }
+} catch (error) {
+    console.log(error)
+
+  if (error.response?.status === 401) {
+    Alert.alert("Login Failed", "Invalid email or password");
+  } 
+  
+} finally {
+  setLoading(false);
+}
+
+};
 
   return (
     <SafeAreaView style={styles.safearea}>
       <View style={styles.container}>
-
+        
         <View style={styles.logoContainer}>
-          <Image style={styles.image} source={require('../assets/4labs_logo.png')} />
+          <Image
+            style={styles.image}
+            source={require('../assets/4labs_logo.png')}
+          />
           <Text style={styles.subtitle}>RMS Call App</Text>
         </View>
 
+        {/* Welcome text */}
         <View style={styles.welcomeContainer}>
           <Text style={styles.welcome}>Welcome back,</Text>
           <Text style={styles.signinText}>Sign in to your account</Text>
         </View>
 
+        {/* Inputs */}
         <View style={styles.cont}>
+          {/* Email */}
           <View>
             <Text style={styles.inputHeading}>Email</Text>
             <View style={styles.inputContainer}>
@@ -40,10 +86,13 @@ function Loginpage() {
                 style={styles.input}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                value={email}
+                onChangeText={setEmail}
               />
             </View>
           </View>
 
+          {/* Password */}
           <View>
             <Text style={styles.inputHeading}>Password</Text>
             <View style={styles.inputContainer}>
@@ -53,8 +102,12 @@ function Loginpage() {
                 placeholderTextColor="#B3E5FC"
                 secureTextEntry={!showPassword}
                 style={styles.input}
+                value={password}
+                onChangeText={setPassword}
               />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+              <TouchableOpacity
+                onPress={() => setShowPassword(!showPassword)}
+              >
                 {showPassword ? (
                   <EyeOff size={20} color="#B3E5FC" />
                 ) : (
@@ -65,13 +118,23 @@ function Loginpage() {
           </View>
         </View>
 
+        {/* Login button */}
         <View style={styles.logincont}>
-          <TouchableOpacity style={styles.loginBtn} onPress={()=>navigation.navigate("Ticket")}>
-            <Text style={styles.loginText}>Login</Text>
-            <LogIn size={20} color="black"/>
-          </TouchableOpacity> 
+          <TouchableOpacity
+            style={styles.loginBtn}
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="black" />
+            ) : (
+              <>
+                <Text style={styles.loginText}>Login</Text>
+                <LogIn size={20} color="black" />
+              </>
+            )}
+          </TouchableOpacity>
         </View>
-
       </View>
     </SafeAreaView>
   );
@@ -79,39 +142,18 @@ function Loginpage() {
 
 export default Loginpage;
 
+// 💅 styles remain the same as your original
 const styles = StyleSheet.create({
-  safearea: {
-    flex: 1,
-    backgroundColor: '#0380C7',
-    padding:5
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: 'center'
-  },
-
-  logoContainer: {
-    alignItems: 'center',
-  
-  },
- 
-  logoText: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#fff',
-    fontFamily: 'Satoshi-Bold',
-    letterSpacing: 2,
-  },
+  safearea: { flex: 1, backgroundColor: '#0380C7', padding: 5 },
+  container: { flex: 1, paddingHorizontal: 24, justifyContent: 'center' },
+  logoContainer: { alignItems: 'center' },
   subtitle: {
     color: '#E0F2F1',
     fontFamily: 'Satoshi-Regular',
     fontSize: 16,
     marginTop: 8,
   },
-  welcomeContainer: {
-    marginTop: 50,
-  },
+  welcomeContainer: { marginTop: 50 },
   welcome: {
     fontFamily: 'Satoshi-Regular',
     fontSize: 33,
@@ -128,7 +170,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderRadius: 6,
     flexDirection: 'row',
-    alignItems: 'center', 
+    alignItems: 'center',
     marginBottom: 20,
     marginTop: 5,
     borderBottomWidth: 0.5,
@@ -138,7 +180,7 @@ const styles = StyleSheet.create({
   inputHeading: {
     fontFamily: 'Satoshi-Medium',
     fontSize: 16,
-    color: '#fff',  
+    color: '#fff',
   },
   input: {
     flex: 1,
@@ -148,9 +190,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Satoshi-Regular',
     fontSize: 14,
   },
-  icon: {
-    marginRight: 8,
-  },
+  icon: { marginRight: 8 },
   loginBtn: {
     flexDirection: 'row',
     backgroundColor: '#fff',
@@ -160,8 +200,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     marginTop: 0,
-    fontFamily:'Satoshi-Regular'
-
+    fontFamily: 'Satoshi-Regular',
   },
   loginText: {
     fontSize: 16,
@@ -169,9 +208,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: 'Satoshi-Medium',
   },
-  cont: {
-    marginTop: 70,
-    marginBottom: 100,
-    gap: 24
-  },
+  cont: { marginTop: 70, marginBottom: 100, gap: 24 },
 });

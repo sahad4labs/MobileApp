@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,79 +8,98 @@ import {
   TextInput,
   Image,
   Pressable,
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import Header from '../components/Header';
 import { Search } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
-
-
-const dummyTickets = [
-  {
-    id: 'ID23456',
-    title: 'Frontend Developer',
-    location: 'Infosys - Trivandrum',
-    openings: 24,
-    profileImage: require('../assets/userImage.png'),
-  },
-  {
-    id: 'ID23456',
-    title: 'Ui/UX Designer',
-    location: 'Infosys - Trivandrum',
-    openings: 24,
-    profileImage: require('../assets/userImage.png'),
-  },
-  {
-    id: 'ID23456',
-    title: 'Tester',
-    location: 'Infosys - Trivandrum',
-    openings: 24,
-    profileImage: require('../assets/userImage.png'),
-  },
-];
+import api from '../services/api'; 
 
 export default function TicketsPage() {
-   const navigation = useNavigation();
+  const navigation = useNavigation();
+  const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    const fetchTickets = async () => {
+      try {
+        const response = await api.get('/api/gettickets/'); 
+        setTickets(response.data); 
+        console.log(response.data);
+      } catch (error) {
+        console.error('Error fetching tickets:', error);
+        Alert.alert('Error', 'Failed to fetch tickets from server');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTickets();
+  }, []);
+
+  const filteredTickets = tickets.filter(ticket =>
+    ticket.title.toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#0380C7" />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <Header />
         <View style={styles.bodyContainer}>
-
           <View style={styles.searchWrapper}>
             <Search size={18} style={styles.searchIcon} />
             <TextInput
               placeholder="Search Tickets"
               placeholderTextColor="#9CA3AF"
               style={styles.searchInput}
+              value={search}
+              onChangeText={setSearch}
             />
           </View>
 
-         
           <FlatList
-            data={dummyTickets}
-            keyExtractor={(item, index) => item.id + index}
+            data={filteredTickets}
+            keyExtractor={(item) => item.id.toString()}
             style={styles.flatlist}
             contentContainerStyle={{ paddingBottom: 40 }}
             renderItem={({ item }) => (
-              <Pressable onPress={()=>navigation.navigate('Profile', { ticket: item })}>
-              <View style={styles.ticketCard}>
-                <View style={styles.ticketHeader}>
-                  <Text style={styles.ticketTitle}>{item.title}</Text>
-                  <Text style={styles.ticketId}>{item.id}</Text>
-                </View>
-                <View style={styles.ticketFooter}>
-                  <View>
-                    <Text style={styles.ticketSubText}>{item.location}</Text>
-                    <Text style={styles.ticketSubText}>Opening - {item.openings}</Text>
+              <Pressable onPress={() => navigation.navigate('Profile', { ticket: item })}>
+                <View style={styles.ticketCard}>
+                  <View style={styles.ticketHeader}>
+                    <Text style={styles.ticketTitle}>{item.title}</Text>
+                    <Text style={styles.ticketId}>{item.id}</Text>
                   </View>
-                  <View style={styles.rightFooter}>
-                    <Text style={styles.assignedText}>Assigned by</Text>
-                    <Image source={item.profileImage} style={styles.profileImage} />
-
+                  <View style={styles.ticketFooter}>
+                    <View>
+                      <Text style={styles.ticketSubText}>{item.location}</Text>
+                      <Text style={styles.ticketSubText}>Opening - {item.openings}</Text>
+                    </View>
+                    <View style={styles.rightFooter}>
+                      <Text style={styles.assignedText}>Assigned by</Text>
+                      {item.assigned_by?.profile_pic ? (
+                        <Image
+                          source={{ uri: item.assigned_by.profile_pic }}
+                          style={styles.profileImage}
+                        />
+                      ) : (
+                        <Image
+                          source={require('../assets/userImage.png')}
+                          style={styles.profileImage}
+                        />
+                      )}
+                    </View>
                   </View>
-
                 </View>
-              </View>
               </Pressable>
             )}
           />
