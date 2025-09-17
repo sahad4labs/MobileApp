@@ -1,9 +1,8 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TextInput,
   FlatList,
   TouchableOpacity,
@@ -12,154 +11,206 @@ import {
   Platform,
   NativeEventEmitter,
   NativeModules,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useRoute } from "@react-navigation/native";
-import Header_page from "../components/Header_page";
 import { Search, PhoneCall, ScanQrCode } from "lucide-react-native";
 import RNFS from "react-native-fs";
-
+import Layout from "./Layout";
+import api from "../services/api";
+import { useUser } from "../Context/userContext";
+import mime from "mime";
 
 const { CallModule } = NativeModules;
 const RECORDINGS_FOLDER = "/storage/emulated/0/Recordings/Call";
 
-const dummyProfiles = [
-  { id: 1, name: "Johnnie Thompson", role: "Frontend Developer", experience: "4 - 6 Years", number: "8848527200" },
-  { id: 2, name: "Miss Joy Blick", role: "Frontend Developer", experience: "4 - 6 Years", number: "8075011889" },
-  { id: 3, name: "Ms. Alma Collins", role: "Frontend Developer", experience: "4 - 6 Years", number: "8075011889" },
-  { id: 4, name: "Dr. Erick Hettinger", role: "Frontend Developer", experience: "4 - 6 Years", number: "8075011889" },
-  { id: 5, name: "Kristie Nienow V", role: "Frontend Developer", experience: "4 - 6 Years", number: "8075011889" },
-];
-
 export default function ProfilePage() {
   const route = useRoute();
   const { ticket } = route.params;
+   const { setActiveProfileId, setActiveTicketId,activeProfileId, activeTicketId } = useUser();
 
- 
+  const [profiles, setProfiles] = useState([]);
+  const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      try {
+        const response = await api.get(`/api/getprofiles/${ticket.id}`);
+        setProfiles(response.data.profiles);
+        console.log(response.data.profiles);
+      } catch (error) {
+        console.error("Error fetching tickets:", error);
+        Alert.alert("Error", "Failed to fetch tickets from server");
+      } finally {
+        setLoading(false);
+      }
+    };
 
- const requestAllPermissions = async () => {
-  if (Platform.OS !== "android") return true;
+    fetchProfiles();
+  }, []);
 
+  const uploadRecording = async (ticketId, profileId, filePath) => {
   try {
-    let results = {};
+    const formData = new FormData();
+    formData.append("ticket_id", ticketId);
+    formData.append("profile_id", profileId);
+    formData.append("file", {
+      uri: "file://" + filePath,       
+      name: filePath.split("/").pop(),
+      type: mime.getType(filePath)
+    });
 
-  
-    if (Platform.Version >= 33) {
-      results.audio = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.READ_MEDIA_AUDIO,
-        {
-          title: "Audio Permission",
-          message: "App needs access to your call recordings",
-          buttonPositive: "OK",
-        }
-      );
-    } else {
-      results.audio = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-        {
-          title: "Storage Permission",
-          message: "App needs access to your call recordings",
-          buttonPositive: "OK",
-        }
-      );
-    }
+    const response = await api.post("/api/postrecord/", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
 
-   
-    results.phone = await PermissionsAndroid.request(
-      PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
-      {
-        title: "Phone Permission",
-        message: "App needs access to detect calls",
-        buttonPositive: "OK",
-      }
-    );
-
-    
-    results.callLog = await PermissionsAndroid.request(
-      PermissionsAndroid.PERMISSIONS.READ_CALL_LOG,
-      {
-        title: "Call Log Permission",
-        message: "App needs access to confirm missed/ended calls",
-        buttonPositive: "OK",
-      }
-    );
-
-    
-    const allGranted = Object.values(results).every(
-      (r) => r === PermissionsAndroid.RESULTS.GRANTED
-    );
-
-    if (!allGranted) {
-      console.warn("❌ Some permissions denied:", results);
-    }
-
-    return allGranted;
+    console.log(" Upload success:", response.data);
   } catch (err) {
-    console.warn("❌ Permission error:", err);
-    return false;
+    console.error(" Upload failed:", err.response?.data || err.message);
   }
 };
 
-  const handleCall = async (phoneNumber) => {
-    const granted = await requestAllPermissions();
-    if (!granted) {
-      console.log("❌ Storage permission denied");
-      return;
+ useEffect(() => {
+  const emitter = new NativeEventEmitter();
+  CallModule.startCallListener();
+
+  const sub = emitter.addListener("CallEnded", async () => {
+    console.log("📴 Call ended! Ticket:", activeTicketId, "Profile:", activeProfileId);
+
+    try {
+      const files = await RNFS.readDir(RECORDINGS_FOLDER);
+
+      if (!files || files.length === 0) {
+        console.log(" No recordings found in:", RECORDINGS_FOLDER);
+      } else {
+        let latestFile = files[0];
+        files.forEach((f) => {
+          if (f.mtime && latestFile.mtime && f.mtime > latestFile.mtime) {
+            latestFile = f;
+          }
+        });
+
+        console.log(" Latest recording file:", latestFile.path);
+
+     
+        await uploadRecording(activeTicketId, activeProfileId, latestFile.path);
+      }
+    } catch (err) {
+      console.error(" Error reading recordings:", err);
     }
+  });
 
-    console.log("📞 Calling:", phoneNumber);
-    const url = `tel:${phoneNumber}`;
-    Linking.openURL(url).catch((err) => console.log("❌ Error opening call:", err));
+  return () => {
+    sub.remove();
+    CallModule.stopCallListener();
+  };
+}, [activeProfileId, activeTicketId]);
 
-    // 🎯 Start listening only for this call
-    const callEmitter = new NativeEventEmitter(CallModule);
-    CallModule.startCallListener();
+  const requestAllPermissions = async () => {
+    if (Platform.OS !== "android") return true;
 
-    const subscription = callEmitter.addListener("CallEnded", async () => {
-      console.log("📴 Call ended detected!");
+    try {
+      let results = {};
 
-      try {
-        const files = await RNFS.readDir(RECORDINGS_FOLDER);
-
-        if (!files || files.length === 0) {
-          console.log("⚠️ No recordings found in:", RECORDINGS_FOLDER);
-        } else {
-          let latestFile = files[0];
-          files.forEach((f) => {
-            if (f.mtime && latestFile.mtime && f.mtime > latestFile.mtime) {
-              latestFile = f;
-            }
-          });
-
-          console.log("📂 Latest recording file:", latestFile.path);
-        }
-      } catch (err) {
-        console.error("❌ Error reading recordings:", err);
+      if (Platform.Version >= 33) {
+        results.audio = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.READ_MEDIA_AUDIO,
+          {
+            title: "Audio Permission",
+            message: "App needs access to your call recordings",
+            buttonPositive: "OK",
+          }
+        );
+      } else {
+        results.audio = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+          {
+            title: "Storage Permission",
+            message: "App needs access to your call recordings",
+            buttonPositive: "OK",
+          }
+        );
       }
 
-      // 🧹 Clean up after detecting
-      subscription.remove();
-      CallModule.stopCallListener();
-    });
+      results.phone = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
+        {
+          title: "Phone Permission",
+          message: "App needs access to detect calls",
+          buttonPositive: "OK",
+        }
+      );
+
+      results.callLog = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.READ_CALL_LOG,
+        {
+          title: "Call Log Permission",
+          message: "App needs access to confirm missed/ended calls",
+          buttonPositive: "OK",
+        }
+      );
+
+      const allGranted = Object.values(results).every(
+        (r) => r === PermissionsAndroid.RESULTS.GRANTED
+      );
+
+      if (!allGranted) {
+        console.warn(" Some permissions denied:", results);
+      }
+
+      return allGranted;
+    } catch (err) {
+      console.warn(" Permission error:", err);
+      return false;
+    }
   };
 
-  const renderProfile = ({ item }) => (
-    <View style={styles.profileCard}>
-      <View>
-        <Text style={styles.profileName}>{item.name}</Text>
-        <Text style={styles.profileSub}>
-          {item.role} | {item.experience}
-        </Text>
+  const handleCall = async (phoneNumber,profileId) => {
+    const granted = await requestAllPermissions();
+    if (!granted) {
+      console.log(" Storage permission denied");
+      return;
+    }
+    setActiveProfileId(profileId)
+    setActiveTicketId(ticket.id)
+
+    console.log("📞 Calling:", phoneNumber, "Profile:", profileId, "Ticket:", ticket.id);
+    const url = `tel:${phoneNumber}`;
+    Linking.openURL(url).catch((err) =>
+      console.log("Error opening call:", err)
+    );
+  };
+
+  const renderProfile = ({ item }) => {
+    return (
+      <View style={styles.profileCard}>
+        <View>
+          <Text style={styles.profileName}>{item?.name}</Text>
+          <Text style={styles.profileSub}>
+            {item?.parsed?.role} | {item?.parsed?.years_of_experience}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={styles.callBtn}
+          onPress={() => handleCall(item?.phone,item?.id)}
+        >
+          <PhoneCall size={20} color="#fff" />
+        </TouchableOpacity>
       </View>
-      <TouchableOpacity style={styles.callBtn} onPress={() => handleCall(item.number)}>
-        <PhoneCall size={20} color="#fff" />
-      </TouchableOpacity>
-    </View>
-  );
+    );
+  };
+
+  if (loading) {
+    return (
+      <Layout headerProps={{ title: ticket.title, showBack: true }}>
+        <ActivityIndicator size="large" color="#0380C7" />
+      </Layout>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <Header_page isProfilePage title={ticket.title} />
+    <Layout headerProps={{ title: ticket.title, showBack: true }}>
       <View style={styles.container}>
         <View style={styles.searchWrapper}>
           <Search size={18} style={styles.searchIcon} />
@@ -170,20 +221,28 @@ export default function ProfilePage() {
           />
         </View>
 
-        <FlatList
-          data={dummyProfiles}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={renderProfile}
-          contentContainerStyle={{ paddingBottom: 90 }}
-          style={styles.flatList}
-        />
+        {profiles.length === 0 ? (
+          <View style={{ padding: 20, alignItems: "center" }}>
+            <Text style={{ color: "#6B7280", fontSize: 16 }}>
+              No profiles available
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={profiles}
+            keyExtractor={(item) => item.id}
+            renderItem={renderProfile}
+            contentContainerStyle={{ paddingBottom: 90 }}
+            style={styles.flatList}
+          />
+        )}
       </View>
 
       <TouchableOpacity style={styles.scanButton}>
         <Text style={styles.scanButtonText}>Scan to Call</Text>
         <ScanQrCode size={18} color="#fff" style={{ marginLeft: 8 }} />
       </TouchableOpacity>
-    </SafeAreaView>
+    </Layout>
   );
 }
 
@@ -217,8 +276,18 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     elevation: 1,
   },
-  profileName: { fontSize: 15, fontWeight: "600", color: "#0380C7", fontFamily: "Satoshi-Bold" },
-  profileSub: { fontSize: 13, color: "#183B56", marginTop: 2, fontFamily: "Satoshi-Regular" },
+  profileName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#0380C7",
+    fontFamily: "Satoshi-Bold",
+  },
+  profileSub: {
+    fontSize: 13,
+    color: "#183B56",
+    marginTop: 2,
+    fontFamily: "Satoshi-Regular",
+  },
   callBtn: { backgroundColor: "#0380C7", padding: 10, borderRadius: 6 },
   scanButton: {
     position: "absolute",
@@ -232,6 +301,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  scanButtonText: { color: "#fff", fontSize: 16, fontWeight: "600", fontFamily: "Satoshi-Bold" },
+  scanButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+    fontFamily: "Satoshi-Bold",
+  },
   flatList: { marginTop: 12 },
 });

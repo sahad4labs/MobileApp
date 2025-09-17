@@ -56,10 +56,16 @@ public class CallModule extends ReactContextBaseJavaModule {
     }
 
     private void sendEvent(String eventName) {
+    if (reactContext != null && reactContext.hasActiveCatalystInstance()) {
         reactContext
             .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
             .emit(eventName, null);
+        Log.i(TAG, "✅ Event sent to JS: " + eventName);
+    } else {
+        Log.w(TAG, "⚠️ React context not active, cannot send: " + eventName);
     }
+}
+
 
   
     private class CallReceiver extends BroadcastReceiver {

@@ -8,6 +8,9 @@ export function UserProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const [activeProfileId, setActiveProfileId] = useState(null);
+  const [activeTicketId, setActiveTicketId] = useState(null);
+
   const fetchUser = async () => {
     try {
       const res = await api.get("/me"); 
@@ -32,7 +35,10 @@ export function UserProvider({ children }) {
   };
 
   return (
-    <UserContext.Provider value={{ user, setUser, fetchUser, logout, loading }}>
+    <UserContext.Provider value={{ user, setUser, fetchUser, logout, loading,activeProfileId,
+        setActiveProfileId,
+        activeTicketId,
+        setActiveTicketId, }}>
       {children}
     </UserContext.Provider>
   );
