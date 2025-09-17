@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import Appnavigator from "./navigation/Appnavigator";
 import BootSplash from "react-native-bootsplash";
+import { UserProvider } from "./Context/userContext";
 
 function App() {
   useEffect(() => {
@@ -14,7 +15,9 @@ function App() {
 
   return (
     <NavigationContainer>
+      <UserProvider>
       <Appnavigator />
+      </UserProvider>
     </NavigationContainer>
   );
 }

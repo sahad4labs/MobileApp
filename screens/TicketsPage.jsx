@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   Alert
 } from 'react-native';
-import Header from '../components/Header';
+import Layout from './Layout';
 import { Search } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import api from '../services/api'; 
@@ -45,16 +45,14 @@ export default function TicketsPage() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+       <Layout headerProps={{ isProfilePage: true }}>
         <ActivityIndicator size="large" color="#0380C7" />
-      </View>
+      </Layout>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <Header />
+     <Layout headerProps={{ isProfilePage: true }}>
         <View style={styles.bodyContainer}>
           <View style={styles.searchWrapper}>
             <Search size={18} style={styles.searchIcon} />
@@ -77,12 +75,12 @@ export default function TicketsPage() {
                 <View style={styles.ticketCard}>
                   <View style={styles.ticketHeader}>
                     <Text style={styles.ticketTitle}>{item.title}</Text>
-                    <Text style={styles.ticketId}>{item.id}</Text>
+                    <Text style={styles.ticketId}>{item.serial_number}</Text>
                   </View>
                   <View style={styles.ticketFooter}>
                     <View>
-                      <Text style={styles.ticketSubText}>{item.location}</Text>
-                      <Text style={styles.ticketSubText}>Opening - {item.openings}</Text>
+                      <Text style={styles.ticketSubText}>{item?.client?.name}</Text>
+                      <Text style={styles.ticketSubText}>Opening - {item.vacancy}</Text>
                     </View>
                     <View style={styles.rightFooter}>
                       <Text style={styles.assignedText}>Assigned by</Text>
@@ -102,10 +100,10 @@ export default function TicketsPage() {
                 </View>
               </Pressable>
             )}
+            showsVerticalScrollIndicator={false}
           />
         </View>
-      </View>
-    </SafeAreaView>
+    </Layout>
   );
 }
 
@@ -118,8 +116,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bodyContainer: {
-    paddingHorizontal: 20
-
+    flex:1,
+    paddingHorizontal: 20,
   },
   searchWrapper: {
     flexDirection: 'row',
@@ -181,6 +179,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#183B56',
     marginBottom: 2,
+    fontWeight:'600',
     fontFamily: 'Satoshi-Regular'
   },
   ticketFooter: {

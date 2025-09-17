@@ -14,12 +14,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import EncryptedStorage from 'react-native-encrypted-storage';
 import api from '../services/api';
+import { useUser } from '../Context/userContext';
 
 function Loginpage() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const { fetchUser } = useUser();
 
 const navigation = useNavigation();
 
@@ -38,6 +40,7 @@ console.log(email,password)
 
   if (response.data?.token) {
     await EncryptedStorage.setItem("authToken", response.data.token);
+    await fetchUser();  
     navigation.reset({ index: 0, routes: [{ name: "Ticket" }] });
   } else {
     Alert.alert("Login Failed", "Invalid response from server");

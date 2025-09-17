@@ -21,6 +21,7 @@
     "react-native-encrypted-storage": "^4.0.3",
     "react-native-fs": "^2.20.0",
     "react-native-gesture-handler": "^2.27.2",
+    "react-native-permissions": "^5.4.2",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-screens": "^4.13.1",
     "react-native-sound": "^0.12.0",

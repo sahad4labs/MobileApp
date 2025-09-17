@@ -4,6 +4,7 @@ import Loginpage from '../screens/Loginpage'
 import TicketsPage from '../screens/TicketsPage'
 import ProfilePage from '../screens/ProfilePage'
 
+
 function Appnavigator() {
     const Stack = createNativeStackNavigator()
     return (
