@@ -36,7 +36,7 @@ public class CallModule extends ReactContextBaseJavaModule {
         if (callReceiver == null) {
             callReceiver = new CallReceiver();
             IntentFilter filter = new IntentFilter();
-            filter.addAction(TelephonyManager.ACTION_PHONE_STATE_CHANGED);
+            filter.addAction("android.intent.action.PHONE_STATE");
             reactContext.registerReceiver(callReceiver, filter);
             Log.i(TAG, "Call listener started");
         }
@@ -68,6 +68,7 @@ public class CallModule extends ReactContextBaseJavaModule {
         @Override
         public void onReceive(Context context, Intent intent) {
             String stateStr = intent.getStringExtra(TelephonyManager.EXTRA_STATE);
+            Log.i(TAG, "onReceive state=" + stateStr);
             if (stateStr == null) return;
 
             if (TelephonyManager.EXTRA_STATE_OFFHOOK.equals(stateStr)) {
