@@ -6,6 +6,18 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.telephony.TelephonyManager;
 import android.util.Log;
+import android.content.ContentResolver;
+import android.content.ContentUris;
+import android.database.Cursor;
+import android.net.Uri;
+import android.os.Build;
+import android.provider.MediaStore;
+import android.app.Activity;
+import android.app.role.RoleManager;
+
+
+
+
 
 import androidx.annotation.NonNull;
 
@@ -13,6 +25,10 @@ import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.modules.core.DeviceEventManagerModule;
+import com.facebook.react.bridge.Promise;
+
+
+import java.io.File;
 
 public class CallModule extends ReactContextBaseJavaModule {
 
@@ -32,6 +48,29 @@ public class CallModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public void requestDefaultDialer(Promise promise) {
+    try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            RoleManager roleManager = (RoleManager) reactContext.getSystemService(Context.ROLE_SERVICE);
+
+            if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)) {
+                Intent intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER);
+
+                Activity currentActivity = getCurrentActivity();
+                if (currentActivity != null) {
+                    currentActivity.startActivityForResult(intent, 1001);
+                    promise.resolve(true);
+                    return;
+                }
+            }
+        }
+        promise.resolve(false);
+    } catch (Exception e) {
+        promise.reject("ROLE_ERROR", e);
+    }
+}
+
+    @ReactMethod
     public void startCallListener() {
         if (callReceiver == null) {
             callReceiver = new CallReceiver();
@@ -41,7 +80,6 @@ public class CallModule extends ReactContextBaseJavaModule {
             Log.i(TAG, "Call listener started");
         }
     }
-
     @ReactMethod
     public void stopCallListener() {
         if (callReceiver != null) {
@@ -54,7 +92,6 @@ public class CallModule extends ReactContextBaseJavaModule {
             Log.i(TAG, "Call listener stopped");
         }
     }
-
     private void sendEvent(String eventName) {
     if (reactContext != null && reactContext.hasActiveCatalystInstance()) {
         reactContext
@@ -66,26 +103,66 @@ public class CallModule extends ReactContextBaseJavaModule {
     }
 }
 
+    private void sendIncomingEvent(String eventName,String phoneNumber){
+        if(reactContext!=null && reactContext.hasActiveCatalystInstance()){
+            reactContext
+           .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
+           .emit(eventName,phoneNumber);
+           Log.i(TAG,"Event sented"+phoneNumber);
+        }
+        else{
+            Log.w(TAG, "⚠️ React context not active, cannot send: " + eventName);
+        }
+
+    }
 
   
-    private class CallReceiver extends BroadcastReceiver {
-        private boolean wasOffhook = false;
+ private class CallReceiver extends BroadcastReceiver {
+    private boolean wasOffhook = false;
+    private String lastState = "";
+    private boolean isIncoming = false;
+    private String incomingNumber = null;
 
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String stateStr = intent.getStringExtra(TelephonyManager.EXTRA_STATE);
-            Log.i(TAG, "onReceive state=" + stateStr);
-            if (stateStr == null) return;
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        String stateStr = intent.getStringExtra(TelephonyManager.EXTRA_STATE);
+        if (stateStr == null) return;
 
-            if (TelephonyManager.EXTRA_STATE_OFFHOOK.equals(stateStr)) {
-                wasOffhook = true;
-            } else if (TelephonyManager.EXTRA_STATE_IDLE.equals(stateStr)) {
-                if (wasOffhook) {
-                    wasOffhook = false;
-                    Log.i(TAG, "Call ended");
+        if (stateStr.equals(lastState)) return;
+        lastState = stateStr;
+
+        Log.i(TAG, "onReceive state=" + stateStr);
+
+        if (TelephonyManager.EXTRA_STATE_RINGING.equals(stateStr)) {
+           
+            incomingNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER);
+            if (incomingNumber == null) incomingNumber = "Unknown";
+            isIncoming = true;
+            Log.i(TAG, "📲 Incoming call from: " + incomingNumber);
+        }
+        else if (TelephonyManager.EXTRA_STATE_OFFHOOK.equals(stateStr)) {
+            // Call is active
+            wasOffhook = true;
+        }
+        else if (TelephonyManager.EXTRA_STATE_IDLE.equals(stateStr)) {
+         
+            if (wasOffhook) {
+                wasOffhook = false;
+
+                if (isIncoming) {
+                    Log.i(TAG, "📱 Incoming call ended: " + incomingNumber);
+                    sendIncomingEvent("CallEndedIncoming", incomingNumber);
+                    isIncoming = false;
+                    incomingNumber = null;
+                } else {
+                    Log.i(TAG, "📞 Outgoing call ended");
                     sendEvent("CallEnded");
                 }
             }
         }
     }
+
+
+}
+
 }

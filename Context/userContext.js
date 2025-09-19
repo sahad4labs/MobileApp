@@ -7,6 +7,7 @@ const UserContext = createContext();
 export function UserProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [path,setPath]=useState(null);
 
   const [activeProfileId, setActiveProfileId] = useState(null);
   const [activeTicketId, setActiveTicketId] = useState(null);
@@ -38,7 +39,9 @@ export function UserProvider({ children }) {
     <UserContext.Provider value={{ user, setUser, fetchUser, logout, loading,activeProfileId,
         setActiveProfileId,
         activeTicketId,
-        setActiveTicketId, }}>
+        setActiveTicketId, 
+        path,
+        setPath}}>
       {children}
     </UserContext.Provider>
   );

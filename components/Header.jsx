@@ -11,6 +11,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { ChevronLeft } from 'lucide-react-native';
 import { useUser } from '../Context/userContext';
+import SettingsModal from './SettingsModal';
 
 export default function Header({
   title,
@@ -20,6 +21,8 @@ export default function Header({
   const navigation = useNavigation();
   const { user, loading, logout } = useUser();
   const [modalVisible, setModalVisible] = useState(false);
+  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [recordingsFolder, setRecordingsFolder] = useState("/storage/emulated/0/Recordings/Call");
 
   const handleLogout = async () => {
     setModalVisible(false);
@@ -78,19 +81,33 @@ export default function Header({
           onPress={() => setModalVisible(false)}
         >
          <View style={styles.dropdown}>
-  {/* Logout */}
+
   <TouchableOpacity onPress={handleLogout} style={styles.dropdownItem}>
     <Text style={styles.dropdownText}>Logout</Text>
   </TouchableOpacity>
 
-  {/* Close */}
+   <TouchableOpacity onPress={()=>{setSettingsVisible(true)
+    setModalVisible(false)}} style={styles.dropdownItem}>
+    <Text style={styles.dropdownText}>Settings</Text>
+  </TouchableOpacity>
+
+
   <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.dropdownItem}>
     <Text style={styles.dropdownTextClose}>Close</Text>
   </TouchableOpacity>
+
+ 
 </View>
 
         </Pressable>
       </Modal>
+
+      <SettingsModal
+  visible={settingsVisible}
+  onClose={() => setSettingsVisible(false)}
+  currentFolder={recordingsFolder}
+  onSave={(path) => setRecordingsFolder(path)}
+/>
     </View>
   );
 }
@@ -171,7 +188,7 @@ dropdownTextClose: {
   color: "#888",
   textAlign: "center",
   fontWeight: "400",
-  borderBottomWidth: 0, // no border
+  borderBottomWidth: 0, 
 }
 
 });

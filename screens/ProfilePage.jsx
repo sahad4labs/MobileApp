@@ -28,85 +28,12 @@ const RECORDINGS_FOLDER = "/storage/emulated/0/Recordings/Call";
 export default function ProfilePage() {
   const route = useRoute();
   const { ticket } = route.params;
-   const { setActiveProfileId, setActiveTicketId,activeProfileId, activeTicketId } = useUser();
+  const { setActiveProfileId, setActiveTicketId, activeProfileId, activeTicketId } = useUser();
 
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchProfiles = async () => {
-      try {
-        const response = await api.get(`/api/getprofiles/${ticket.id}`);
-        setProfiles(response.data.profiles);
-        console.log(response.data.profiles);
-      } catch (error) {
-        console.error("Error fetching tickets:", error);
-        Alert.alert("Error", "Failed to fetch tickets from server");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProfiles();
-  }, []);
-
-  const uploadRecording = async (ticketId, profileId, filePath) => {
-  try {
-    const formData = new FormData();
-    formData.append("ticket_id", ticketId);
-    formData.append("profile_id", profileId);
-    formData.append("file", {
-      uri: "file://" + filePath,       
-      name: filePath.split("/").pop(),
-      type: mime.getType(filePath)
-    });
-
-    const response = await api.post("/api/postrecord/", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-
-    console.log(" Upload success:", response.data);
-  } catch (err) {
-    console.error(" Upload failed:", err.response?.data || err.message);
-  }
-};
-
- useEffect(() => {
-  const emitter = new NativeEventEmitter();
-  CallModule.startCallListener();
-
-  const sub = emitter.addListener("CallEnded", async () => {
-    console.log("📴 Call ended! Ticket:", activeTicketId, "Profile:", activeProfileId);
-
-    try {
-      const files = await RNFS.readDir(RECORDINGS_FOLDER);
-
-      if (!files || files.length === 0) {
-        console.log(" No recordings found in:", RECORDINGS_FOLDER);
-      } else {
-        let latestFile = files[0];
-        files.forEach((f) => {
-          if (f.mtime && latestFile.mtime && f.mtime > latestFile.mtime) {
-            latestFile = f;
-          }
-        });
-
-        console.log(" Latest recording file:", latestFile.path);
-
-     
-        await uploadRecording(activeTicketId, activeProfileId, latestFile.path);
-      }
-    } catch (err) {
-      console.error(" Error reading recordings:", err);
-    }
-  });
-
-  return () => {
-    sub.remove();
-    CallModule.stopCallListener();
-  };
-}, [activeProfileId, activeTicketId]);
-
+ 
   const requestAllPermissions = async () => {
     if (Platform.OS !== "android") return true;
 
@@ -119,6 +46,15 @@ export default function ProfilePage() {
           {
             title: "Audio Permission",
             message: "App needs access to your call recordings",
+            buttonPositive: "OK",
+          }
+        );
+      } else if (Platform.Version >= 30) {
+        results.audio = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.MANAGE_EXTERNAL_STORAGE,
+          {
+            title: "Manage External Storage",
+            message: "App needs access to manage your call recordings",
             buttonPositive: "OK",
           }
         );
@@ -156,32 +92,132 @@ export default function ProfilePage() {
       );
 
       if (!allGranted) {
-        console.warn(" Some permissions denied:", results);
+        console.warn("Some permissions denied:", results);
       }
 
       return allGranted;
     } catch (err) {
-      console.warn(" Permission error:", err);
+      console.warn("Permission error:", err);
       return false;
     }
   };
 
-  const handleCall = async (phoneNumber,profileId) => {
+  // 🔹 Fetch Profiles
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      try {
+        const response = await api.get(`/api/getprofiles/${ticket.id}`);
+        setProfiles(response.data.profiles);
+      } catch (error) {
+        console.error("Error fetching profiles:", error);
+        Alert.alert("Error", "Failed to fetch profiles from server");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfiles();
+  }, []);
+
+  // 🔹 Ask permissions + dialer role on mount
+  useEffect(() => {
+    const initPermissionsAndRole = async () => {
+      const granted = await requestAllPermissions();
+      console.log("🔑 Permissions granted?", granted);
+
+      try {
+        const grantedRole = await CallModule.requestDefaultDialer();
+        console.log("Dialer role requested:", grantedRole);
+      } catch (e) {
+        console.error("Failed to request dialer role:", e);
+      }
+    };
+
+    initPermissionsAndRole();
+  }, []);
+
+  // 🔹 Upload recording
+  const uploadRecording = async (ticketId, profileId, filePath) => {
+    try {
+      const formData = new FormData();
+      formData.append("ticket_id", ticketId);
+      formData.append("profile_id", profileId);
+      formData.append("file", {
+        uri: "file://" + filePath,
+        name: filePath.split("/").pop(),
+        type: mime.getType(filePath),
+      });
+
+      const response = await api.post("/api/postrecord/", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      console.log("✅ Upload success:", response.data);
+      return true;
+    } catch (err) {
+      console.error("❌ Upload failed:", err.response?.data || err.message);
+    }
+  };
+
+  // 🔹 Native Event Listeners
+  useEffect(() => {
+    const emitter = new NativeEventEmitter(CallModule);
+    CallModule.startCallListener();
+
+    const subOutgoing = emitter.addListener("CallEnded", async () => {
+      console.log("📴 Outgoing call ended! Ticket:", activeTicketId, "Profile:", activeProfileId);
+
+      try {
+        const files = await RNFS.readDir(RECORDINGS_FOLDER);
+
+        if (!files || files.length === 0) {
+          console.log("No recordings found in:", RECORDINGS_FOLDER);
+          return;
+        }
+
+        let latestFile = files[0];
+        files.forEach((f) => {
+          if (f.mtime && latestFile.mtime && f.mtime > latestFile.mtime) {
+            latestFile = f;
+          }
+        });
+
+        console.log("🎵 Latest recording file:", latestFile.path);
+
+        await uploadRecording(activeTicketId, activeProfileId, latestFile.path);
+      } catch (err) {
+        console.error("Error handling recordings:", err);
+      }
+    });
+
+    const subIncoming = emitter.addListener("CallEndedIncoming", (phoneNumber) => {
+      console.log("📱 Incoming call ended with number:", phoneNumber);
+      // You can also POST this number to backend if needed
+    });
+
+    return () => {
+      subOutgoing.remove();
+      subIncoming.remove();
+      CallModule.stopCallListener();
+    };
+  }, [activeProfileId, activeTicketId]);
+
+  // 🔹 Handle outgoing call
+  const handleCall = async (phoneNumber, profileId) => {
     const granted = await requestAllPermissions();
     if (!granted) {
-      console.log(" Storage permission denied");
+      console.log("❌ Permissions denied");
       return;
     }
-    setActiveProfileId(profileId)
-    setActiveTicketId(ticket.id)
+    setActiveProfileId(profileId);
+    setActiveTicketId(ticket.id);
 
     console.log("📞 Calling:", phoneNumber, "Profile:", profileId, "Ticket:", ticket.id);
     const url = `tel:${phoneNumber}`;
-    Linking.openURL(url).catch((err) =>
-      console.log("Error opening call:", err)
-    );
+    Linking.openURL(url).catch((err) => console.log("Error opening call:", err));
   };
 
+  // 🔹 Render UI
   const renderProfile = ({ item }) => {
     return (
       <View style={styles.profileCard}>
@@ -193,7 +229,7 @@ export default function ProfilePage() {
         </View>
         <TouchableOpacity
           style={styles.callBtn}
-          onPress={() => handleCall(item?.phone,item?.id)}
+          onPress={() => handleCall(item?.phone, item?.id)}
         >
           <PhoneCall size={20} color="#fff" />
         </TouchableOpacity>
