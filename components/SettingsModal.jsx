@@ -12,12 +12,13 @@ import {
 import { useUser } from "../Context/userContext";
 import api from "../services/api";
 
+
 export default function SettingsModal({ visible, onClose, currentFolder, onSave }) {
   const [folderInput, setFolderInput] = useState(currentFolder || "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const { user } = useUser();
+  const { user,path,setPath } = useUser();
   const userId = user?.user_id;
 
 
@@ -32,6 +33,7 @@ export default function SettingsModal({ visible, onClose, currentFolder, onSave 
       const folderPath = response.data.folder_path;
       if (folderPath) {
         setFolderInput(folderPath);
+        setPath(folderPath);
       }
     } catch (err) {
       console.error("❌ Error fetching folder:", err.response?.data || err.message);
@@ -50,17 +52,17 @@ export default function SettingsModal({ visible, onClose, currentFolder, onSave 
           { headers: { "Content-Type": "application/json" } }
         );
       
-        
+        setPath(path);
         return response.data;
       } catch (err) {
         console.error("❌ Error setting folder:", err.response?.data || err.message);
         throw err;
       }
     },
-    [userId]
+    [userId,setPath]
   );
 
-  // ✅ Handle save button
+
   const handleSave = useCallback(async () => {
     if (!folderInput) {
       setError("Folder path cannot be empty");
@@ -80,13 +82,13 @@ export default function SettingsModal({ visible, onClose, currentFolder, onSave 
     }
   }, [folderInput, setRecordingFolder, onSave, onClose]);
 
-  // ✅ Sync current folder & fetch from backend on open
+  
   useEffect(() => {
     if (visible) {
       setFolderInput(currentFolder || "");
       getRecordingFolder();
     }
-  }, [visible, currentFolder, getRecordingFolder]);
+  }, [visible, currentFolder, getRecordingFolder,path]);
 
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>

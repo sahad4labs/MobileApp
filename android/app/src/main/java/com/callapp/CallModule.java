@@ -56,7 +56,7 @@ public class CallModule extends ReactContextBaseJavaModule {
             if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)) {
                 Intent intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER);
 
-                Activity currentActivity = getCurrentActivity();
+                Activity currentActivity = reactContext.getCurrentActivity();
                 if (currentActivity != null) {
                     currentActivity.startActivityForResult(intent, 1001);
                     promise.resolve(true);
@@ -117,52 +117,59 @@ public class CallModule extends ReactContextBaseJavaModule {
     }
 
   
- private class CallReceiver extends BroadcastReceiver {
+private class CallReceiver extends BroadcastReceiver {
     private boolean wasOffhook = false;
     private String lastState = "";
     private boolean isIncoming = false;
     private String incomingNumber = null;
+    private long lastEndEventTime = 0;
+    private static final long MIN_EVENT_INTERVAL = 2500; 
 
     @Override
     public void onReceive(Context context, Intent intent) {
         String stateStr = intent.getStringExtra(TelephonyManager.EXTRA_STATE);
         if (stateStr == null) return;
 
+       
         if (stateStr.equals(lastState)) return;
         lastState = stateStr;
 
         Log.i(TAG, "onReceive state=" + stateStr);
 
         if (TelephonyManager.EXTRA_STATE_RINGING.equals(stateStr)) {
-           
             incomingNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER);
             if (incomingNumber == null) incomingNumber = "Unknown";
             isIncoming = true;
             Log.i(TAG, "📲 Incoming call from: " + incomingNumber);
-        }
-        else if (TelephonyManager.EXTRA_STATE_OFFHOOK.equals(stateStr)) {
-            // Call is active
+
+        } else if (TelephonyManager.EXTRA_STATE_OFFHOOK.equals(stateStr)) {
             wasOffhook = true;
-        }
-        else if (TelephonyManager.EXTRA_STATE_IDLE.equals(stateStr)) {
-         
-            if (wasOffhook) {
-                wasOffhook = false;
+
+        } else if (TelephonyManager.EXTRA_STATE_IDLE.equals(stateStr)) {
+            if (!wasOffhook) return; 
+
+                long now = System.currentTimeMillis();
+                if (now - lastEndEventTime < MIN_EVENT_INTERVAL) {
+                    Log.i(TAG, "⚠️ Skipping duplicate CallEnded event");
+                    return;
+                }
+                lastEndEventTime = now;
 
                 if (isIncoming) {
                     Log.i(TAG, "📱 Incoming call ended: " + incomingNumber);
                     sendIncomingEvent("CallEndedIncoming", incomingNumber);
-                    isIncoming = false;
-                    incomingNumber = null;
                 } else {
                     Log.i(TAG, "📞 Outgoing call ended");
                     sendEvent("CallEnded");
                 }
+                wasOffhook=false;
+                isIncoming=false;
+                incomingNumber=null;
             }
         }
     }
-
-
 }
 
-}
+
+
+

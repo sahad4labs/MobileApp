@@ -21,14 +21,30 @@ import Layout from "./Layout";
 import api from "../services/api";
 import { useUser } from "../Context/userContext";
 import mime from "mime";
+import Toast from "react-native-toast-message";
 
 const { CallModule } = NativeModules;
-const RECORDINGS_FOLDER = "/storage/emulated/0/Recordings/Call";
+
+// const RECORDINGS_FOLDER = "/storage/emulated/0/Recordings/Call";
 
 export default function ProfilePage() {
   const route = useRoute();
   const { ticket } = route.params;
-  const { setActiveProfileId, setActiveTicketId, activeProfileId, activeTicketId } = useUser();
+  const { setActiveProfileId, setActiveTicketId, activeProfileId, activeTicketId,path } = useUser();
+
+  const RECORDINGS_FOLDER=path;
+  useEffect(() => {
+  if (!RECORDINGS_FOLDER) {
+    Toast.show({
+      type: "info",
+      text1: "Notice",
+      text2: "Please update the recordings path!",
+      position: "top",
+      visibilityTime: 4000,
+    });
+  }
+}, [RECORDINGS_FOLDER]);
+  
 
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -102,7 +118,7 @@ export default function ProfilePage() {
     }
   };
 
-  // 🔹 Fetch Profiles
+
   useEffect(() => {
     const fetchProfiles = async () => {
       try {
@@ -119,7 +135,6 @@ export default function ProfilePage() {
     fetchProfiles();
   }, []);
 
-  // 🔹 Ask permissions + dialer role on mount
   useEffect(() => {
     const initPermissionsAndRole = async () => {
       const granted = await requestAllPermissions();
@@ -136,7 +151,7 @@ export default function ProfilePage() {
     initPermissionsAndRole();
   }, []);
 
-  // 🔹 Upload recording
+
   const uploadRecording = async (ticketId, profileId, filePath) => {
     try {
       const formData = new FormData();
@@ -159,7 +174,7 @@ export default function ProfilePage() {
     }
   };
 
-  // 🔹 Native Event Listeners
+ 
   useEffect(() => {
     const emitter = new NativeEventEmitter(CallModule);
     CallModule.startCallListener();
@@ -184,7 +199,26 @@ export default function ProfilePage() {
 
         console.log("🎵 Latest recording file:", latestFile.path);
 
-        await uploadRecording(activeTicketId, activeProfileId, latestFile.path);
+        const res=await uploadRecording(activeTicketId, activeProfileId, latestFile.path);
+
+        if (res){
+           Toast.show({
+              type: "success", 
+              text1: "Success",
+              text2: "Recordings Saved Successfully",
+              position: "top",
+              visibilityTime: 5000, 
+            });
+        }
+        else{
+           Toast.show({
+              type: "error", 
+              text1: "Error",
+              text2: "Error While Saving Record!",
+              position: "top",
+              visibilityTime: 5000, 
+  });
+        }
       } catch (err) {
         console.error("Error handling recordings:", err);
       }
@@ -192,7 +226,7 @@ export default function ProfilePage() {
 
     const subIncoming = emitter.addListener("CallEndedIncoming", (phoneNumber) => {
       console.log("📱 Incoming call ended with number:", phoneNumber);
-      // You can also POST this number to backend if needed
+     
     });
 
     return () => {
@@ -202,7 +236,7 @@ export default function ProfilePage() {
     };
   }, [activeProfileId, activeTicketId]);
 
-  // 🔹 Handle outgoing call
+
   const handleCall = async (phoneNumber, profileId) => {
     const granted = await requestAllPermissions();
     if (!granted) {
@@ -217,7 +251,7 @@ export default function ProfilePage() {
     Linking.openURL(url).catch((err) => console.log("Error opening call:", err));
   };
 
-  // 🔹 Render UI
+
   const renderProfile = ({ item }) => {
     return (
       <View style={styles.profileCard}>
