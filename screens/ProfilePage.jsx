@@ -174,67 +174,64 @@ export default function ProfilePage() {
     }
   };
 
- 
-  useEffect(() => {
-    const emitter = new NativeEventEmitter(CallModule);
-    CallModule.startCallListener();
+ useEffect(() => {
+  const emitter = new NativeEventEmitter(CallModule);
+  CallModule.startCallListener();
 
-    const subOutgoing = emitter.addListener("CallEnded", async () => {
+  let isProcessing = false;
+
+  const subOutgoing = emitter.addListener("CallEnded", async () => {
+    if (isProcessing) {
+      console.log("⏭ Duplicate CallEnded ignored");
+      return;
+    }
+    isProcessing = true;
+
+    try {
       console.log("📴 Outgoing call ended! Ticket:", activeTicketId, "Profile:", activeProfileId);
 
-      try {
-        const files = await RNFS.readDir(RECORDINGS_FOLDER);
-
-        if (!files || files.length === 0) {
-          console.log("No recordings found in:", RECORDINGS_FOLDER);
-          return;
-        }
-
-        let latestFile = files[0];
-        files.forEach((f) => {
-          if (f.mtime && latestFile.mtime && f.mtime > latestFile.mtime) {
-            latestFile = f;
-          }
-        });
-
-        console.log("🎵 Latest recording file:", latestFile.path);
-
-        const res=await uploadRecording(activeTicketId, activeProfileId, latestFile.path);
-
-        if (res){
-           Toast.show({
-              type: "success", 
-              text1: "Success",
-              text2: "Recordings Saved Successfully",
-              position: "top",
-              visibilityTime: 5000, 
-            });
-        }
-        else{
-           Toast.show({
-              type: "error", 
-              text1: "Error",
-              text2: "Error While Saving Record!",
-              position: "top",
-              visibilityTime: 5000, 
-  });
-        }
-      } catch (err) {
-        console.error("Error handling recordings:", err);
+      const files = await RNFS.readDir(RECORDINGS_FOLDER);
+      if (!files || files.length === 0) {
+        console.log("No recordings found");
+        return;
       }
-    });
 
-    const subIncoming = emitter.addListener("CallEndedIncoming", (phoneNumber) => {
-      console.log("📱 Incoming call ended with number:", phoneNumber);
-     
-    });
+      let latestFile = files[0];
+      files.forEach((f) => {
+        if (f.mtime && latestFile.mtime && f.mtime > latestFile.mtime) {
+          latestFile = f;
+        }
+      });
 
-    return () => {
-      subOutgoing.remove();
-      subIncoming.remove();
-      CallModule.stopCallListener();
-    };
-  }, [activeProfileId, activeTicketId]);
+      console.log("🎵 Latest recording file:", latestFile.path);
+
+      const res = await uploadRecording(activeTicketId, activeProfileId, latestFile.path);
+
+      Toast.show({
+        type: res ? "success" : "error",
+        text1: res ? "Success" : "Error",
+        text2: res ? "Recording Saved Successfully" : "Error While Saving Record!",
+        position: "top",
+        visibilityTime: 5000,
+      });
+    } catch (err) {
+      console.error("Error handling recordings:", err);
+    } finally {
+      isProcessing = false;
+    }
+  });
+
+  const subIncoming = emitter.addListener("CallEndedIncoming", (phoneNumber) => {
+    console.log("📱 Incoming call ended with number:", phoneNumber);
+  });
+
+  return () => {
+    subOutgoing.remove();
+    subIncoming.remove();
+    CallModule.stopCallListener();
+  };
+}, [activeProfileId, activeTicketId]);
+
 
 
   const handleCall = async (phoneNumber, profileId) => {

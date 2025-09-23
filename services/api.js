@@ -15,3 +15,5 @@ api.interceptors.request.use(async (config) => {
 });
 
 export default api;
+
+// http://192.168.60.246:8000
