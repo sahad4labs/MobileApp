@@ -115,6 +115,8 @@ export default function ProfilePage() {
     const fetchProfiles = async () => {
       try {
         const response = await api.get(`/api/getprofiles/${ticket.id}`);
+        console.log(response);
+        
         setProfiles(response.data.profiles);
       } catch (error) {
         console.error("Error fetching profiles:", error);
@@ -126,23 +128,6 @@ export default function ProfilePage() {
 
     fetchProfiles();
   }, []);
-
-  useEffect(() => {
-    const initPermissionsAndRole = async () => {
-      const granted = await requestAllPermissions();
-      console.log("🔑 Permissions granted?", granted);
-
-      try {
-        const grantedRole = await CallModule.requestDefaultDialer();
-        console.log("Dialer role requested:", grantedRole);
-      } catch (e) {
-        console.error("Failed to request dialer role:", e);
-      }
-    };
-
-    initPermissionsAndRole();
-  }, []);
-
 
   const uploadRecording = async (ticketId, profileId, filePath) => {
     try {
