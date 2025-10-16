@@ -94,14 +94,6 @@ export default function ProfilePage() {
         }
       );
 
-      results.callLog = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.READ_CALL_LOG,
-        {
-          title: "Call Log Permission",
-          message: "App needs access to confirm missed/ended calls",
-          buttonPositive: "OK",
-        }
-      );
 
       const allGranted = Object.values(results).every(
         (r) => r === PermissionsAndroid.RESULTS.GRANTED

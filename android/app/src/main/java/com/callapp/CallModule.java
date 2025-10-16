@@ -47,28 +47,6 @@ public class CallModule extends ReactContextBaseJavaModule {
         return "CallModule";
     }
 
-    @ReactMethod
-    public void requestDefaultDialer(Promise promise) {
-    try {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            RoleManager roleManager = (RoleManager) reactContext.getSystemService(Context.ROLE_SERVICE);
-
-            if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)) {
-                Intent intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER);
-
-                Activity currentActivity = reactContext.getCurrentActivity();
-                if (currentActivity != null) {
-                    currentActivity.startActivityForResult(intent, 1001);
-                    promise.resolve(true);
-                    return;
-                }
-            }
-        }
-        promise.resolve(false);
-    } catch (Exception e) {
-        promise.reject("ROLE_ERROR", e);
-    }
-}
 
     @ReactMethod
     public void startCallListener() {
