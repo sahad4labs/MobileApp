@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from 'react';
 import {
   Modal,
   View,
@@ -8,64 +8,46 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
-} from "react-native";
-import { useUser } from "../Context/userContext";
-import api from "../services/api";
+} from 'react-native';
+import { useUser } from '../Context/userContext';
+import api from '../services/api';
+export default function SettingsModal({ visible, onClose, onSave }) {
+  const { user, setUser } = useUser();
+  const userId = user?.userid;
 
-
-export default function SettingsModal({ visible, onClose, currentFolder, onSave }) {
-  const [folderInput, setFolderInput] = useState(currentFolder || "");
+  const [folderInput, setFolderInput] = useState(user?.folder);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const { user,path,setPath } = useUser();
-  const userId = user?.user_id;
+  React.useEffect(() => {
+    setFolderInput(user?.folder);
+  }, [user?.folder]);
 
-
-  const getRecordingFolder = useCallback(async () => {
-    if (!userId) return;
-
-    try {
-      const response = await api.get(`/api/getfolder/${userId}`);
-      console.log(response);
-      
-
-      const folderPath = response.data.folder_path;
-      if (folderPath) {
-        setFolderInput(folderPath);
-        setPath(folderPath);
-      }
-    } catch (err) {
-      console.error("❌ Error fetching folder:", err.response?.data || err.message);
-    }
-  }, [userId]);
-
-  
   const setRecordingFolder = useCallback(
-    async (path) => {
+    async path => {
       if (!userId) return;
 
       try {
-        const response = await api.post(
-          "/api/postfolder/",
-          { user_id: userId, folder_path: path },
-          { headers: { "Content-Type": "application/json" } }
+        await api.post(
+          '/api/postfolder/',
+          { user_id: userId, folder_path: `/storage/emulated/0/${path}` },
+          { headers: { 'Content-Type': 'application/json' } },
         );
-      
-        setPath(path);
-        return response.data;
+        setUser(prev => ({ ...prev, folder: path }));
       } catch (err) {
-        console.error("❌ Error setting folder:", err.response?.data || err.message);
+        console.error(
+          '❌ Error setting folder:',
+          err.response?.data || err.message,
+        );
         throw err;
       }
     },
-    [userId,setPath]
+    [userId, setUser],
   );
-
 
   const handleSave = useCallback(async () => {
     if (!folderInput) {
-      setError("Folder path cannot be empty");
+      setError('Folder path cannot be empty');
       return;
     }
 
@@ -73,25 +55,22 @@ export default function SettingsModal({ visible, onClose, currentFolder, onSave 
     setError(null);
     try {
       await setRecordingFolder(folderInput);
-      onSave(folderInput);
+      onSave?.(folderInput);
       onClose();
     } catch (err) {
-      setError("Failed to save folder. Try again.");
+      setError('Failed to save folder. Try again.');
     } finally {
       setLoading(false);
     }
-  }, [folderInput, setRecordingFolder, onSave, onClose]);
-
-  
-  useEffect(() => {
-    if (visible) {
-      setFolderInput(currentFolder || "");
-      getRecordingFolder();
-    }
-  }, [visible, currentFolder, getRecordingFolder,path]);
+  }, [folderInput, setRecordingFolder, onClose, onSave]);
 
   return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
+    <Modal
+      transparent
+      animationType="fade"
+      visible={visible}
+      onRequestClose={onClose}
+    >
       <Pressable style={styles.modalOverlay} onPress={onClose}>
         <View style={styles.container}>
           <Text style={styles.title}>Set Recordings Folder</Text>
@@ -104,80 +83,87 @@ export default function SettingsModal({ visible, onClose, currentFolder, onSave 
 
           {error && <Text style={styles.errorText}>{error}</Text>}
 
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveText}>Save</Text>}
+          <TouchableOpacity
+            style={styles.saveBtn}
+            onPress={handleSave}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.saveText}>Save</Text>
+            )}
           </TouchableOpacity>
 
-          <Text style={styles.currentText}>Paste your recording folder directory here</Text>
+          <Text style={styles.currentText}>
+            Paste your recording folder directory here
+          </Text>
           <Text style={styles.currentText2}>e.g. Recordings/Call</Text>
-          <Text style={styles.currentText3}>Current Path: {folderInput || "Not set"}</Text>
+          <Text style={styles.currentText3}>
+            Current Path: {folderInput || 'Not set'}
+          </Text>
         </View>
       </Pressable>
     </Modal>
   );
 }
-
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: "#00000080",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: '#00000080',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   container: {
-    width: "85%",
-    backgroundColor: "#fff",
+    width: '85%',
+    backgroundColor: '#fff',
     borderRadius: 8,
     padding: 20,
   },
   title: {
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: '600',
     marginBottom: 10,
-    fontFamily: "Satoshi-Regular",
+    fontFamily: 'Satoshi-Regular',
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: '#ccc',
     borderRadius: 6,
     padding: 10,
     marginBottom: 10,
-    fontFamily: "Satoshi-Regular",
+    fontFamily: 'Satoshi-Regular',
   },
   saveBtn: {
-    backgroundColor: "#0380C7",
+    backgroundColor: '#0380C7',
     padding: 10,
     borderRadius: 6,
     marginBottom: 10,
   },
   saveText: {
-    color: "#fff",
-    textAlign: "center",
-    fontFamily: "Satoshi-Regular",
+    color: '#fff',
+    textAlign: 'center',
+    fontFamily: 'Satoshi-Regular',
   },
-  currentText: {
-    fontSize: 12,
-    color: "#555",
-    fontFamily: "Satoshi-Regular",
-  },
+  currentText: { fontSize: 12, color: '#555', fontFamily: 'Satoshi-Regular' },
   currentText2: {
     fontSize: 12,
-    color: "#555",
-    textAlign: "center",
-    fontFamily: "Satoshi-Regular",
+    color: '#555',
+    textAlign: 'center',
+    fontFamily: 'Satoshi-Regular',
   },
   currentText3: {
     fontSize: 12,
-    color: "#555",
-    textAlign: "center",
-    fontWeight: "500",
+    color: '#555',
+    textAlign: 'center',
+    fontWeight: '500',
     marginTop: 10,
-    fontFamily: "Satoshi-Regular",
+    fontFamily: 'Satoshi-Regular',
   },
   errorText: {
     fontSize: 12,
-    color: "red",
+    color: 'red',
     marginBottom: 5,
-    textAlign: "center",
+    textAlign: 'center',
   },
 });

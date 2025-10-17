@@ -39,7 +39,9 @@ export default function TicketsPage() {
     fetchTickets();
   }, []);
 
-  const filteredTickets = tickets.filter(ticket =>
+  const filteredTickets = tickets
+  .filter(ticket => ticket.status === "created")  
+  .filter(ticket =>
     ticket.title.toLowerCase().includes(search.toLowerCase())
   );
 

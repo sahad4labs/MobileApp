@@ -31,16 +31,13 @@ const handleLogin = async () => {
     return;
   }
 
-console.log(email,password)
 
   setLoading(true);
  try {
   const response = await api.post("/login/", { email, password });
-  console.log(response);
-
   if (response.data?.token) {
     await EncryptedStorage.setItem("authToken", response.data.token);
-    await fetchUser();  
+    await fetchUser();   
     navigation.reset({ index: 0, routes: [{ name: "Ticket" }] });
   } else {
     Alert.alert("Login Failed", "Invalid response from server");

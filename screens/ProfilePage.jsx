@@ -30,9 +30,11 @@ const { CallModule } = NativeModules;
 export default function ProfilePage() {
   const route = useRoute();
   const { ticket } = route.params;
-  const { setActiveProfileId, setActiveTicketId, activeProfileId, activeTicketId,path } = useUser();
+  const { setActiveProfileId, setActiveTicketId, activeProfileId, activeTicketId,user} = useUser();
 
-  const RECORDINGS_FOLDER=path;
+  const RECORDINGS_FOLDER=user?.folder;
+  console.log(RECORDINGS_FOLDER);
+  
   useEffect(() => {
   if (!RECORDINGS_FOLDER) {
     Toast.show({

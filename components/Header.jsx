@@ -24,6 +24,8 @@ export default function Header({
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [recordingsFolder, setRecordingsFolder] = useState("/storage/emulated/0/Recordings/Call");
 
+  console.log(user);
+
   const handleLogout = async () => {
     setModalVisible(false);
     await logout();
@@ -105,8 +107,6 @@ export default function Header({
       <SettingsModal
   visible={settingsVisible}
   onClose={() => setSettingsVisible(false)}
-  currentFolder={recordingsFolder}
-  onSave={(path) => setRecordingsFolder(path)}
 />
     </View>
   );
