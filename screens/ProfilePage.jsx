@@ -1,158 +1,366 @@
-import React from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TextInput,
   FlatList,
   TouchableOpacity,
-  Image,
-} from 'react-native';
-import { useRoute } from '@react-navigation/native';
-import Header_page from '../components/Header_page';
-import { Search } from 'lucide-react-native';
-import { PhoneCall, ScanQrCode } from 'lucide-react-native';
+  Linking,
+  PermissionsAndroid,
+  Platform,
+  NativeEventEmitter,
+  NativeModules,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
+import { useRoute } from "@react-navigation/native";
+import { Search, PhoneCall, ScanQrCode } from "lucide-react-native";
+import RNFS from "react-native-fs";
+import Layout from "./Layout";
+import api from "../services/api";
+import { useUser } from "../Context/userContext";
+import mime from "mime";
+import Toast from "react-native-toast-message";
 
-const dummyProfiles = [
-  { id: 1, name: 'Johnnie Thompson', role: 'Frontend Developer', experience: '4 - 6 Years' },
-  { id: 2, name: 'Miss Joy Blick', role: 'Frontend Developer', experience: '4 - 6 Years' },
-  { id: 3, name: 'Ms. Alma Collins', role: 'Frontend Developer', experience: '4 - 6 Years' },
-  { id: 4, name: 'Dr. Erick Hettinger', role: 'Frontend Developer', experience: '4 - 6 Years' },
-  { id: 5, name: 'Kristie Nienow V', role: 'Frontend Developer', experience: '4 - 6 Years' },
-];
+const { CallModule } = NativeModules;
+
+// const RECORDINGS_FOLDER = "/storage/emulated/0/Recordings/Call";
 
 export default function ProfilePage() {
   const route = useRoute();
   const { ticket } = route.params;
+  const { setActiveProfileId, setActiveTicketId, activeProfileId, activeTicketId,user} = useUser();
 
-  const renderProfile = ({ item }) => (
-    <View style={styles.profileCard}>
-      <View>
-        <Text style={styles.profileName}>{item.name}</Text>
-        <Text style={styles.profileSub}>
-          {item.role} | {item.experience}
-        </Text>
+  const RECORDINGS_FOLDER=user?.folder;
+  console.log(RECORDINGS_FOLDER);
+  
+  useEffect(() => {
+  if (!RECORDINGS_FOLDER) {
+    Toast.show({
+      type: "info",
+      text1: "Notice",
+      text2: "Please update the recordings path!",
+      position: "top",
+      visibilityTime: 4000,
+    });
+  }
+}, [RECORDINGS_FOLDER]);
+  
+
+  const [profiles, setProfiles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+
+  const Filteredprofiles=profiles.filter((profile)=>{
+    return profile.name.toLowerCase().includes(search.toLowerCase())
+  })
+ 
+  const requestAllPermissions = async () => {
+    if (Platform.OS !== "android") return true;
+
+    try {
+      let results = {};
+
+      if (Platform.Version >= 33) {
+        results.audio = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.READ_MEDIA_AUDIO,
+          {
+            title: "Audio Permission",
+            message: "App needs access to your call recordings",
+            buttonPositive: "OK",
+          }
+        );
+      } else if (Platform.Version >= 30) {
+        results.audio = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.MANAGE_EXTERNAL_STORAGE,
+          {
+            title: "Manage External Storage",
+            message: "App needs access to manage your call recordings",
+            buttonPositive: "OK",
+          }
+        );
+      } else {
+        results.audio = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+          {
+            title: "Storage Permission",
+            message: "App needs access to your call recordings",
+            buttonPositive: "OK",
+          }
+        );
+      }
+
+      results.phone = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
+        {
+          title: "Phone Permission",
+          message: "App needs access to detect calls",
+          buttonPositive: "OK",
+        }
+      );
+
+
+      const allGranted = Object.values(results).every(
+        (r) => r === PermissionsAndroid.RESULTS.GRANTED
+      );
+
+      if (!allGranted) {
+        console.warn("Some permissions denied:", results);
+      }
+
+      return allGranted;
+    } catch (err) {
+      console.warn("Permission error:", err);
+      return false;
+    }
+  };
+
+
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      try {
+        const response = await api.get(`/api/getprofiles/${ticket.id}`);
+        console.log(response);
+        
+        setProfiles(response.data.profiles);
+      } catch (error) {
+        console.error("Error fetching profiles:", error);
+        Alert.alert("Error", "Failed to fetch profiles from server");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfiles();
+  }, []);
+
+  const uploadRecording = async (ticketId, profileId, filePath) => {
+    try {
+      const formData = new FormData();
+      formData.append("ticket_id", ticketId);
+      formData.append("profile_id", profileId);
+      formData.append("file", {
+        uri: "file://" + filePath,
+        name: filePath.split("/").pop(),
+        type: mime.getType(filePath),
+      });
+
+      const response = await api.post("/api/postrecord/", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      console.log("✅ Upload success:", response.data);
+      return true;
+    } catch (err) {
+      console.error("❌ Upload failed:", err.response?.data || err.message);
+    }
+  };
+
+ useEffect(() => {
+  const emitter = new NativeEventEmitter(CallModule);
+  CallModule.startCallListener();
+
+  let isProcessing = false;
+
+  const subOutgoing = emitter.addListener("CallEnded", async () => {
+    if (isProcessing) {
+      console.log("⏭ Duplicate CallEnded ignored");
+      return;
+    }
+    isProcessing = true;
+
+    try {
+      console.log("📴 Outgoing call ended! Ticket:", activeTicketId, "Profile:", activeProfileId);
+
+      const files = await RNFS.readDir(RECORDINGS_FOLDER);
+      if (!files || files.length === 0) {
+        console.log("No recordings found");
+        return;
+      }
+
+      let latestFile = files[0];
+      files.forEach((f) => {
+        if (f.mtime && latestFile.mtime && f.mtime > latestFile.mtime) {
+          latestFile = f;
+        }
+      });
+
+      console.log("🎵 Latest recording file:", latestFile.path);
+
+      const res = await uploadRecording(activeTicketId, activeProfileId, latestFile.path);
+
+      Toast.show({
+        type: res ? "success" : "error",
+        text1: res ? "Success" : "Error",
+        text2: res ? "Recording Saved Successfully" : "Error While Saving Record!",
+        position: "top",
+        visibilityTime: 5000,
+      });
+    } catch (err) {
+      console.error("Error handling recordings:", err);
+    } finally {
+      isProcessing = false;
+    }
+  });
+
+  const subIncoming = emitter.addListener("CallEndedIncoming", (phoneNumber) => {
+    console.log("📱 Incoming call ended with number:", phoneNumber);
+  });
+
+  return () => {
+    subOutgoing.remove();
+    subIncoming.remove();
+    CallModule.stopCallListener();
+  };
+}, [activeProfileId, activeTicketId]);
+
+
+
+  const handleCall = async (phoneNumber, profileId) => {
+    const granted = await requestAllPermissions();
+    if (!granted) {
+      console.log("❌ Permissions denied");
+      return;
+    }
+    setActiveProfileId(profileId);
+    setActiveTicketId(ticket.id);
+
+    console.log("📞 Calling:", phoneNumber, "Profile:", profileId, "Ticket:", ticket.id);
+    const url = `tel:${phoneNumber}`;
+    Linking.openURL(url).catch((err) => console.log("Error opening call:", err));
+  };
+
+
+  const renderProfile = ({ item }) => {
+    return (
+      <View style={styles.profileCard}>
+        <View>
+          <Text style={styles.profileName}>{item?.name}</Text>
+          <Text style={styles.profileSub}>
+            {item?.phone} | {item?.parsed?.years_of_experience}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={styles.callBtn}
+          onPress={() => handleCall(item?.phone, item?.id)}
+        >
+          <PhoneCall size={20} color="#fff" />
+        </TouchableOpacity>
       </View>
-      <TouchableOpacity style={styles.callBtn}>
-        <PhoneCall size={20} color="#fff" />
-      </TouchableOpacity>
-    </View>
-  );
+    );
+  };
+
+  if (loading) {
+    return (
+      <Layout headerProps={{ title: ticket.title, showBack: true }}>
+        <ActivityIndicator size="large" color="#0380C7" />
+      </Layout>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <Header_page isProfilePage title={ticket.title} />
+    <Layout headerProps={{ title: ticket.title, showBack: true }}>
       <View style={styles.container}>
-     
         <View style={styles.searchWrapper}>
           <Search size={18} style={styles.searchIcon} />
           <TextInput
             placeholder="Search Profiles"
             placeholderTextColor="#9CA3AF"
             style={styles.searchInput}
+            value={search}
+            onChangeText={setSearch}
           />
         </View>
 
-
-        <FlatList
-          data={dummyProfiles}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={renderProfile}
-          contentContainerStyle={{ paddingBottom: 90 }}
-          style={styles.flatList}
-        />
+        {profiles.length === 0 ? (
+          <View style={{ padding: 20, alignItems: "center" }}>
+            <Text style={{ color: "#6B7280", fontSize: 16 }}>
+              No profiles available
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={Filteredprofiles}
+            keyExtractor={(item) => item.id}
+            renderItem={renderProfile}
+            contentContainerStyle={{ paddingBottom: 20 }}
+            style={styles.flatList}
+          />
+        )}
       </View>
-
+      
+      <View style={styles.scannerWrapper}>
       <TouchableOpacity style={styles.scanButton}>
         <Text style={styles.scanButtonText}>Scan to Call</Text>
-        <ScanQrCode  size={18} color="#fff" style={{ marginLeft: 8 }} />
+        <ScanQrCode size={18} color="#fff" style={{ marginLeft: 8 }} />
       </TouchableOpacity>
-    </SafeAreaView>
+      </View>
+    </Layout>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  container: {
-    padding: 20,
-    flex: 1,
-  },
+  safeArea: { flex: 1, backgroundColor: "#fff" },
+  container: { padding: 20, flex: 1 },
   searchWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#D9D9D980',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#D9D9D980",
     borderRadius: 8,
     paddingHorizontal: 12,
     height: 40,
-    marginTop: 5
-    ,
+    marginTop: 5,
     marginBottom: 10,
   },
-  searchIcon: {
-    marginRight: 8,
-    marginBottom: 5,
-    color: '#838383',
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: '#111827',
-  },
+  searchIcon: { marginRight: 8, marginBottom: 5, color: "#838383" },
+  searchInput: { flex: 1, fontSize: 15, color: "#111827" },
   profileCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: "#E5E7EB",
     borderRadius: 8,
     padding: 18,
     marginBottom: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    shadowColor: '#000',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowOffset: { width: 0, height: 1 },
     elevation: 1,
   },
   profileName: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#0380C7',
-    fontFamily:'Satoshi-Bold'
+    fontWeight: "600",
+    color: "#0380C7",
+    fontFamily: "Satoshi-Bold",
   },
   profileSub: {
     fontSize: 13,
-    color: '#183B56',
+    color: "#183B56",
     marginTop: 2,
-    fontFamily:'Satoshi-Regular'
+    fontFamily: "Satoshi-Regular",
   },
-  callBtn: {
-    backgroundColor: '#0380C7',
-    padding: 10,
-    borderRadius: 6,
-  },
+  callBtn: { backgroundColor: "#0380C7", padding: 10, borderRadius: 6 },
   scanButton: {
-    position: 'absolute',
-    bottom: 70,
-    left: 20,
-    right: 20,
     height: 48,
-    backgroundColor: '#0380C7',
+    backgroundColor: "#0380C7",
     borderRadius: 8,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
   },
   scanButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600',
-    fontFamily:'Satoshi-Bold'
+    fontWeight: "600",
+    fontFamily: "Satoshi-Bold",
   },
-  flatList:{
-    marginTop:12
+  flatList: { marginTop: 12 },
+  scannerWrapper:{
+    paddingHorizontal:20,
+    marginBottom:13
+
   }
 });

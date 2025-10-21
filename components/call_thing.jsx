@@ -32,7 +32,6 @@ const App = () => {
 
  const requestPermissions = async () => {
   if (Platform.OS !== 'android') {
-    // iOS or other platforms – go ahead
     return loadRecordings();
   }
 
