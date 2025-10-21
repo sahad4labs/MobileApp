@@ -2,7 +2,7 @@ import axios from "axios";
 import EncryptedStorage from "react-native-encrypted-storage";
 
 const api = axios.create({
-  baseURL: "http://192.168.20.6:8000",
+  baseURL: "http://192.168.68.102:8000",
 });
 
 

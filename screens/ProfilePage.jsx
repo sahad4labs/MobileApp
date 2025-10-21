@@ -50,7 +50,11 @@ export default function ProfilePage() {
 
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
+  const Filteredprofiles=profiles.filter((profile)=>{
+    return profile.name.toLowerCase().includes(search.toLowerCase())
+  })
  
   const requestAllPermissions = async () => {
     if (Platform.OS !== "android") return true;
@@ -234,7 +238,7 @@ export default function ProfilePage() {
         <View>
           <Text style={styles.profileName}>{item?.name}</Text>
           <Text style={styles.profileSub}>
-            {item?.parsed?.role} | {item?.parsed?.years_of_experience}
+            {item?.phone} | {item?.parsed?.years_of_experience}
           </Text>
         </View>
         <TouchableOpacity
@@ -264,6 +268,8 @@ export default function ProfilePage() {
             placeholder="Search Profiles"
             placeholderTextColor="#9CA3AF"
             style={styles.searchInput}
+            value={search}
+            onChangeText={setSearch}
           />
         </View>
 
@@ -275,19 +281,21 @@ export default function ProfilePage() {
           </View>
         ) : (
           <FlatList
-            data={profiles}
+            data={Filteredprofiles}
             keyExtractor={(item) => item.id}
             renderItem={renderProfile}
-            contentContainerStyle={{ paddingBottom: 90 }}
+            contentContainerStyle={{ paddingBottom: 20 }}
             style={styles.flatList}
           />
         )}
       </View>
-
+      
+      <View style={styles.scannerWrapper}>
       <TouchableOpacity style={styles.scanButton}>
         <Text style={styles.scanButtonText}>Scan to Call</Text>
         <ScanQrCode size={18} color="#fff" style={{ marginLeft: 8 }} />
       </TouchableOpacity>
+      </View>
     </Layout>
   );
 }
@@ -336,10 +344,6 @@ const styles = StyleSheet.create({
   },
   callBtn: { backgroundColor: "#0380C7", padding: 10, borderRadius: 6 },
   scanButton: {
-    position: "absolute",
-    bottom: 70,
-    left: 20,
-    right: 20,
     height: 48,
     backgroundColor: "#0380C7",
     borderRadius: 8,
@@ -354,4 +358,9 @@ const styles = StyleSheet.create({
     fontFamily: "Satoshi-Bold",
   },
   flatList: { marginTop: 12 },
+  scannerWrapper:{
+    paddingHorizontal:20,
+    marginBottom:13
+
+  }
 });
