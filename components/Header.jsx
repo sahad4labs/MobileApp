@@ -22,7 +22,9 @@ export default function Header({
   const { user, loading, logout } = useUser();
   const [modalVisible, setModalVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
-  const [recordingsFolder, setRecordingsFolder] = useState("/storage/emulated/0/Recordings/Call");
+  const [recordingsFolder, setRecordingsFolder] = useState(
+    '/storage/emulated/0/Recordings/Call',
+  );
 
   console.log(user);
 
@@ -82,32 +84,38 @@ export default function Header({
           style={styles.modalOverlay}
           onPress={() => setModalVisible(false)}
         >
-         <View style={styles.dropdown}>
+          <View style={styles.dropdown}>
+            <TouchableOpacity
+              onPress={handleLogout}
+              style={styles.dropdownItem}
+            >
+              <Text style={styles.dropdownText}>Logout</Text>
+            </TouchableOpacity>
 
-  <TouchableOpacity onPress={handleLogout} style={styles.dropdownItem}>
-    <Text style={styles.dropdownText}>Logout</Text>
-  </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                setSettingsVisible(true);
+                setModalVisible(false);
+              }}
+              style={styles.dropdownItem}
+            >
+              <Text style={styles.dropdownText}>Settings</Text>
+            </TouchableOpacity>
 
-   <TouchableOpacity onPress={()=>{setSettingsVisible(true)
-    setModalVisible(false)}} style={styles.dropdownItem}>
-    <Text style={styles.dropdownText}>Settings</Text>
-  </TouchableOpacity>
-
-
-  <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.dropdownItem}>
-    <Text style={styles.dropdownTextClose}>Close</Text>
-  </TouchableOpacity>
-
- 
-</View>
-
+            <TouchableOpacity
+              onPress={() => setModalVisible(false)}
+              style={styles.dropdownItem}
+            >
+              <Text style={styles.dropdownTextClose}>Close</Text>
+            </TouchableOpacity>
+          </View>
         </Pressable>
       </Modal>
 
       <SettingsModal
-  visible={settingsVisible}
-  onClose={() => setSettingsVisible(false)}
-/>
+        visible={settingsVisible}
+        onClose={() => setSettingsVisible(false)}
+      />
     </View>
   );
 }
@@ -159,36 +167,35 @@ const styles = StyleSheet.create({
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.2)' },
   dropdown: {
-  position: "absolute",
-  top: 125, 
-  right: 10,
-  backgroundColor: "#fff",
-  borderRadius: 8,
-  overflow: "hidden",
-  elevation: 0, 
-},
+    position: 'absolute',
+    top: 125,
+    right: 10,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    overflow: 'hidden',
+    elevation: 0,
+  },
 
-dropdownItem: {
-  paddingVertical: 12,
-  paddingHorizontal: 20,
-  borderBottomWidth: 1,
-  borderBottomColor: "#eee", 
-},
+  dropdownItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
 
-dropdownText: {
-  fontSize: 16,
-  color: "#183B56",
-  textAlign: "center",
-  fontWeight: "700",
-  fontFamily:'Satoshi-Regular'
-},
+  dropdownText: {
+    fontSize: 16,
+    color: '#183B56',
+    textAlign: 'center',
+    fontWeight: '700',
+    fontFamily: 'Satoshi-Regular',
+  },
 
-dropdownTextClose: {
-  fontSize: 16,
-  color: "#888",
-  textAlign: "center",
-  fontWeight: "400",
-  borderBottomWidth: 0, 
-}
-
+  dropdownTextClose: {
+    fontSize: 16,
+    color: '#888',
+    textAlign: 'center',
+    fontWeight: '400',
+    borderBottomWidth: 0,
+  },
 });

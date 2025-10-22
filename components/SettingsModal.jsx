@@ -11,38 +11,40 @@ import {
 } from 'react-native';
 import { useUser } from '../Context/userContext';
 import api from '../services/api';
+
 export default function SettingsModal({ visible, onClose, onSave }) {
   const { user, setUser } = useUser();
   const userId = user?.userid;
 
-  const [folderInput, setFolderInput] = useState(user?.folder);
+  const [folderInput, setFolderInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   React.useEffect(() => {
-    setFolderInput(user?.folder);
+    if (user?.folder?.startsWith('/storage/emulated/0/')) {
+      setFolderInput(user.folder.replace('/storage/emulated/0/', ''));
+    } else {
+      setFolderInput(user?.folder || '');
+    }
   }, [user?.folder]);
 
   const setRecordingFolder = useCallback(
-    async path => {
+    async (path) => {
       if (!userId) return;
 
       try {
         await api.post(
           '/api/postfolder/',
-          { user_id: userId, folder_path: `/storage/emulated/0/${path}` },
-          { headers: { 'Content-Type': 'application/json' } },
+          { user_id: userId, folder_path: path },
+          { headers: { 'Content-Type': 'application/json' } }
         );
-        setUser(prev => ({ ...prev, folder: path }));
+        setUser((prev) => ({ ...prev, folder: path }));
       } catch (err) {
-        console.error(
-          '❌ Error setting folder:',
-          err.response?.data || err.message,
-        );
+        console.error('❌ Error setting folder:', err.response?.data || err.message);
         throw err;
       }
     },
-    [userId, setUser],
+    [userId, setUser]
   );
 
   const handleSave = useCallback(async () => {
@@ -54,11 +56,17 @@ export default function SettingsModal({ visible, onClose, onSave }) {
     setLoading(true);
     setError(null);
     try {
-      await setRecordingFolder(folderInput);
-      onSave?.(folderInput);
+      
+      const fullPath = folderInput.startsWith('/storage/emulated/0/')
+        ? folderInput
+        : `/storage/emulated/0/${folderInput}`;
+
+      await setRecordingFolder(fullPath);
+      onSave?.(fullPath);
       onClose();
     } catch (err) {
-      setError('Failed to save folder. Try again.');
+      const backendMsg = err.response?.data?.error || err.response?.data?.message;
+      setError(backendMsg || 'Failed to save folder. Try again.');
     } finally {
       setLoading(false);
     }
@@ -78,7 +86,7 @@ export default function SettingsModal({ visible, onClose, onSave }) {
             style={styles.input}
             value={folderInput}
             onChangeText={setFolderInput}
-            placeholder="Enter folder path"
+            placeholder="Enter folder path (e.g. Recordings/Call)"
           />
 
           {error && <Text style={styles.errorText}>{error}</Text>}
@@ -100,13 +108,17 @@ export default function SettingsModal({ visible, onClose, onSave }) {
           </Text>
           <Text style={styles.currentText2}>e.g. Recordings/Call</Text>
           <Text style={styles.currentText3}>
-            Current Path: {folderInput || 'Not set'}
+            Current Path:{' '}
+            {folderInput
+              ? `/storage/emulated/0/${folderInput}`
+              : 'Not set'}
           </Text>
         </View>
       </Pressable>
     </Modal>
   );
 }
+
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,

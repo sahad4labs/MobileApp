@@ -22,6 +22,7 @@ import api from "../services/api";
 import { useUser } from "../Context/userContext";
 import mime from "mime";
 import Toast from "react-native-toast-message";
+import { useNavigation } from "@react-navigation/native";
 
 const { CallModule } = NativeModules;
 
@@ -29,6 +30,7 @@ const { CallModule } = NativeModules;
 
 export default function ProfilePage() {
   const route = useRoute();
+  const navigation = useNavigation();
   const { ticket } = route.params;
   const { setActiveProfileId, setActiveTicketId, activeProfileId, activeTicketId,user} = useUser();
 
@@ -291,7 +293,8 @@ export default function ProfilePage() {
       </View>
       
       <View style={styles.scannerWrapper}>
-      <TouchableOpacity style={styles.scanButton}>
+      <TouchableOpacity style={styles.scanButton}
+       onPress={() => navigation.navigate('CameraScreen')}>
         <Text style={styles.scanButtonText}>Scan to Call</Text>
         <ScanQrCode size={18} color="#fff" style={{ marginLeft: 8 }} />
       </TouchableOpacity>

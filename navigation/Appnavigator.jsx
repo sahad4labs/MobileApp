@@ -3,6 +3,7 @@ import React from 'react'
 import Loginpage from '../screens/Loginpage'
 import TicketsPage from '../screens/TicketsPage'
 import ProfilePage from '../screens/ProfilePage'
+import CameraScreen from '../screens/cameraScreen'
 
 
 function Appnavigator() {
@@ -13,6 +14,7 @@ function Appnavigator() {
                 <Stack.Screen name="Login" component={Loginpage} options={{ headerShown: false }}/>
                 <Stack.Screen name="Ticket" component={TicketsPage} options={{ headerShown: false }}/>
                 <Stack.Screen name="Profile" component={ProfilePage} options={{ headerShown: false }}/>
+                <Stack.Screen name="CameraScreen" component={CameraScreen} options={{ headerShown: false }}/>
             </Stack.Navigator> 
         </>
     )
