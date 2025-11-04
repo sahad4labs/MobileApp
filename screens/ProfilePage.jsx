@@ -23,6 +23,7 @@ import { useUser } from "../Context/userContext";
 import mime from "mime";
 import Toast from "react-native-toast-message";
 import { useNavigation } from "@react-navigation/native";
+import axios from "axios";
 
 const { CallModule } = NativeModules;
 
@@ -137,27 +138,48 @@ export default function ProfilePage() {
     fetchProfiles();
   }, []);
 
-  const uploadRecording = async (ticketId, profileId, filePath) => {
-    try {
-      const formData = new FormData();
-      formData.append("ticket_id", ticketId);
-      formData.append("profile_id", profileId);
-      formData.append("file", {
-        uri: "file://" + filePath,
-        name: filePath.split("/").pop(),
-        type: mime.getType(filePath),
-      });
-
-      const response = await api.post("/api/postrecord/", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      console.log("✅ Upload success:", response.data);
-      return true;
-    } catch (err) {
-      console.error("❌ Upload failed:", err.response?.data || err.message);
+const uploadRecording = async (profileId, filePath) => {
+  try {
+    const exists = await RNFS.exists(filePath);
+    if (!exists) {
+      console.error("❌ File not found:", filePath);
+      return false;
     }
-  };
+
+    await new Promise((r) => setTimeout(r, 1500));
+
+    const formData = new FormData();
+    formData.append("profile_id", profileId);
+    formData.append("file", {
+      uri: filePath.startsWith("file://") ? filePath : "file://" + filePath,
+      name: filePath.split("/").pop(),
+      type: mime.getType(filePath) || "audio/mpeg",
+    });
+
+    const response = await fetch("https://dev-rms-backend.4labsinc.com/api/postrecord/", {
+      method: "POST",
+      body: formData,
+      timeout: 60000, 
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ Upload failed:", errorText);
+      return false;
+    }
+
+    const data = await response.json();
+    console.log("✅ Upload success:", data);
+    return true;
+
+  } catch (err) {
+    console.error("❌ Network error:", err.message);
+    return false;
+  }
+};
+
+
+
 
  useEffect(() => {
   const emitter = new NativeEventEmitter(CallModule);
@@ -190,7 +212,7 @@ export default function ProfilePage() {
 
       console.log("🎵 Latest recording file:", latestFile.path);
 
-      const res = await uploadRecording(activeTicketId, activeProfileId, latestFile.path);
+      const res = await uploadRecording( activeProfileId,latestFile.path);
 
       Toast.show({
         type: res ? "success" : "error",

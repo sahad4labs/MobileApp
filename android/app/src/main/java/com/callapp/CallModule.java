@@ -14,13 +14,7 @@ import android.os.Build;
 import android.provider.MediaStore;
 import android.app.Activity;
 import android.app.role.RoleManager;
-
-
-
-
-
 import androidx.annotation.NonNull;
-
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
